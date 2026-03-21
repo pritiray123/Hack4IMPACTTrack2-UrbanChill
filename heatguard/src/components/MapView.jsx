@@ -4,6 +4,8 @@ import 'leaflet.heat';
 import { getRisk } from '../utils/riskHelpers';
 import { LanguageContext } from '../context/LanguageContext';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
 // Google Maps-style road tile (standard Maps look, with English labels)
 const TILE_URL = 'https://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}';
 const TILE_OPTS = {
@@ -166,7 +168,7 @@ export default function MapView({ center, zoom, zones, afterMode, onZoneClick, s
     });
 
     try {
-      const resp = await fetch(`http://localhost:5000/api/temperature?lat=${lat}&lng=${lng}`);
+      const resp = await fetch(`${API_BASE_URL}/api/temperature?lat=${lat}&lng=${lng}`);
       const data = await resp.json();
       if (clickPopupRef.current === popup) {
         clickPopupRef.current.setContent(buildPopupHTML(data, false, t));
@@ -213,7 +215,14 @@ export default function MapView({ center, zoom, zones, afterMode, onZoneClick, s
     });
     map.on('mouseout', () => setHoverData(null));
 
-    return () => { map.remove(); mapInstanceRef.current = null; };
+    return () => {
+      map.remove();
+      mapInstanceRef.current = null;
+      userMarkerRef.current = null;
+      clickMarkerRef.current = null;
+      clickPopupRef.current = null;
+      routeLayerRef.current = null;
+    };
   }, []);
 
   // Update user location marker
@@ -294,21 +303,22 @@ export default function MapView({ center, zoom, zones, afterMode, onZoneClick, s
 
     if (!zones.length) return;
 
+    // Clear the temporary map-click marker/popup only if we just clicked a standard grid zone
+    if (selectedZone && !selectedZone.isCustomPin) {
+      if (clickPopupRef.current) {
+        map.removeLayer(clickPopupRef.current);
+        clickPopupRef.current = null;
+      }
+      if (clickMarkerRef.current) {
+        map.removeLayer(clickMarkerRef.current);
+        clickMarkerRef.current = null;
+      }
+    }
+
     zones.forEach((zone) => {
       const temp = afterMode ? +(zone.temp * 0.82).toFixed(1) : zone.temp;
       const risk = getRisk(temp);
       const isSelected = selectedZone && selectedZone.id === zone.id;
-
-      if (!selectedZone || !selectedZone.isCustomPin) {
-         if (clickPopupRef.current) {
-            map.removeLayer(clickPopupRef.current);
-            clickPopupRef.current = null;
-         }
-         if (clickMarkerRef.current) {
-            map.removeLayer(clickMarkerRef.current);
-            clickMarkerRef.current = null;
-         }
-      }
 
       if (zone.isCustomPin) {
         // ── Teammate's custom SVG pin marker for dropped pins ────────────────

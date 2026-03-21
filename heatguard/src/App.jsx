@@ -10,6 +10,8 @@ import { getRisk } from './utils/riskHelpers';
 import { getRecommendations } from './utils/claudeAPI';
 import { LanguageContext } from './context/LanguageContext';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
 export default function App() {
   const [cityName, setCityName] = useState('');
   const [center, setCenter] = useState({ lat: 19.076, lng: 72.8777 });
@@ -33,7 +35,7 @@ export default function App() {
 
   const fetchCityData = useCallback(async (query) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/city/${encodeURIComponent(query)}`);
+      const res = await fetch(`${API_BASE_URL}/api/city/${encodeURIComponent(query)}`);
       if (!res.ok) throw new Error('Failed to load location data from server.');
       const data = await res.json();
       
@@ -176,7 +178,7 @@ export default function App() {
   const handleMapClick = useCallback(async (lat, lng) => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/api/pin', {
+      const res = await fetch(`${API_BASE_URL}/api/pin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lat, lng })
@@ -263,7 +265,7 @@ export default function App() {
         }
       }
 
-      const advRes = await fetch('http://localhost:5000/api/route-plan', {
+      const advRes = await fetch(`${API_BASE_URL}/api/route-plan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ source: startName, destination: endName, mode, currentTemp: stats?.avgTemp || 32 })

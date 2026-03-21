@@ -1,6 +1,7 @@
 import { getRisk } from './riskHelpers';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 function buildPrompt(zone, risk) {
   return `You are an urban climate expert. Analyse this urban zone and give 3 specific green infrastructure interventions.
@@ -60,7 +61,7 @@ export async function getRecommendations(zone, lang = 'en') {
   const token = localStorage.getItem('heatguard_token');
   
   try {
-    const res = await fetch('http://localhost:5000/api/analyse-zone', {
+    const res = await fetch(`${API_BASE_URL}/api/analyse-zone`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -2,6 +2,8 @@ import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { exportReport } from '../utils/pdfExport';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
 export default function HistoryPanel() {
   const { user, token } = useContext(AuthContext);
   const [reports, setReports] = useState([]);
@@ -14,7 +16,7 @@ export default function HistoryPanel() {
     const fetchReports = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`http://localhost:5000/api/reports/${user.id}`, {
+        const res = await fetch(`${API_BASE_URL}/api/reports/${user.id}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

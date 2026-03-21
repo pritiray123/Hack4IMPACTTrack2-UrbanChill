@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const fetch = global.fetch || ((...args) => import('node-fetch').then(({default: fetch}) => fetch(...args)));
 const { initDB, getDB } = require('./db');
+const path = require('path');
 
 dotenv.config();
 
@@ -28,6 +29,11 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
+// --- HEALTH CHECK ---
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date(), uptime: process.uptime() });
+});
 
 // --- AUTHENTICATION ENDPOINTS ---
 
@@ -778,12 +784,25 @@ app.get('/api/temperature', async (req, res) => {
       country = addr.country_code ? addr.country_code.toUpperCase() : '';
     }
 
-    return res.json({ lat: parsedLat, lng: parsedLng, temp, feelsLike, humidity, windSpeed, description, icon, locationName, country, realtime: !!owmKey });
+  return res.json({ lat: parsedLat, lng: parsedLng, temp, feelsLike, humidity, windSpeed, description, icon, locationName, country, realtime: !!owmKey });
   } catch (error) {
     console.error('/api/temperature error:', error);
     res.status(500).json({ error: error.message });
   }
 });
+
+// --- STATIC ASSETS (Production) ---
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.join(__dirname, '../heatguard/dist');
+  app.use(express.static(distPath));
+  
+  // Catch-all route to serve the frontend for any non-API request
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api/')) {
+      res.sendFile(path.join(distPath, 'index.html'));
+    }
+  });
+}
 
 // Initialize DB and Start Server
 initDB().then(() => {

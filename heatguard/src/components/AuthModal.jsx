@@ -1,6 +1,8 @@
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
 export default function AuthModal() {
   const { isAuthModalOpen, closeAuthModal, login } = useContext(AuthContext);
   const [isLogin, setIsLogin] = useState(true);
@@ -14,7 +16,7 @@ export default function AuthModal() {
     e.preventDefault();
     setError('');
 
-    const url = isLogin ? 'http://localhost:5000/api/auth/login' : 'http://localhost:5000/api/auth/signup';
+    const url = isLogin ? `${API_BASE_URL}/api/auth/login` : `${API_BASE_URL}/api/auth/signup`;
     
     try {
       const res = await fetch(url, {
