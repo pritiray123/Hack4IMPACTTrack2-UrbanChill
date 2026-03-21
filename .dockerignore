@@ -1,0 +1,23 @@
+# Ignore Node.js dependencies
+node_modules
+npm-debug.log
+
+# Ignore frontend build output
+heatguard/dist
+
+# Ignore SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Ignore environment variables
+.env
+.env.production
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore Git
+.git
+.gitignore
