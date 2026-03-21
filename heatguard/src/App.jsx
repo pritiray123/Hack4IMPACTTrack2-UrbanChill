@@ -19,7 +19,7 @@ export default function App() {
   const [recommendations, setRecommendations] = useState(null);
   const [recLoading, setRecLoading] = useState(false);
   const [afterMode, setAfterMode] = useState(false);
-  const [activeTab, setActiveTab] = useState('zone');
+  const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -67,6 +67,7 @@ export default function App() {
     setSelectedZone(null);
     setRecommendations(null);
     setAfterMode(false);
+    setActiveTab('overview');
 
     await fetchCityData(input.trim());
     setLoading(false);
