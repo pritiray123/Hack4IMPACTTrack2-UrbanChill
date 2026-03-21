@@ -1,5 +1,7 @@
+require('dotenv').config();
+
 async function testGemini25() {
-  const geminiApiKey = 'AIzaSyB7f7-Ny6nbo_Zz_MkgY0PGxUK8TwrzC88';
+  const geminiApiKey = process.env.GEMINI_API_KEY;
   const prompt = `You are an urban climate expert. Analyse this urban zone and give 3 specific green infrastructure interventions.\n\nZone data:\n- Name: Test Zone\n- Land use: Commercial\n- Surface temperature: 38°C\n- Green cover: 10%\n- Air Quality Index: 120\n- Population density: 25000 people/km²\n- Humidity: 45%\n- Heat risk level: HIGH\n\nRespond ONLY with a valid JSON object. No markdown, no explanation outside JSON:\n{\n  "interventions": [\n    {\n      "type": "TREES" | "COOL PAVEMENT" | "ROOFTOP GARDEN" | "GREEN WALL" | "WATER FEATURE" | "PARK",\n      "action": "specific actionable recommendation in one sentence",\n      "impact": "projected temperature reduction and benefit"\n    }\n  ],\n  "summary": "2-sentence overall assessment and most urgent priority",\n  "projected_temp_reduction": "e.g. −3.2°C with all interventions",\n  "priority": "HIGH" | "MEDIUM" | "LOW"\n}`;
 
   try {
