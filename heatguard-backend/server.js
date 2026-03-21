@@ -806,10 +806,12 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Initialize DB and Start Server
-initDB().then(() => {
+initDB().catch(err => {
+  console.error('CRITICAL: Failed to initialize database on startup.', err.message);
+  console.error('The server will start but database features may fail.');
+}).finally(() => {
   app.listen(PORT, () => {
     console.log(`Backend server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   });
-}).catch(err => {
-  console.error('Failed to initialize database', err);
 });

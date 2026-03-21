@@ -3,11 +3,33 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false // Required for Supabase/Heroku unless you configure CAcerts
+function parseConnectionString(url) {
+  try {
+    // Better regex to split user:pass from host:port/db
+    const uriMatch = url.match(/postgresql:\/\/([^:]+):(.*)@([^:/]+)(?::(\d+))?\/(.+)/);
+    if (!uriMatch) return { connectionString: url };
+    
+    return {
+      user: uriMatch[1],
+      password: decodeURIComponent(uriMatch[2]), // Decode if the user encoded it, otherwise leave as is
+      host: uriMatch[3],
+      port: parseInt(uriMatch[4] || 6543), // Use 6543 as the default Pooler port for stability
+      database: uriMatch[5].split('?')[0]
+    };
+  } catch (e) {
+    return { connectionString: url };
   }
+}
+
+const dbConfig = parseConnectionString(process.env.DATABASE_URL || '');
+const pool = new Pool({
+  ...dbConfig,
+  ssl: {
+    rejectUnauthorized: false
+  },
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
 });
 
 let db = {
