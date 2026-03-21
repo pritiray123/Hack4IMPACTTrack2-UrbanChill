@@ -4,7 +4,7 @@ import 'leaflet.heat';
 import { getRisk } from '../utils/riskHelpers';
 import { LanguageContext } from '../context/LanguageContext';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
 
 // Google Maps-style road tile (standard Maps look, with English labels)
 const TILE_URL = 'https://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}';

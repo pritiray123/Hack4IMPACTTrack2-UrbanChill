@@ -1,7 +1,7 @@
 import { getRisk } from './riskHelpers';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
 
 function buildPrompt(zone, risk) {
   return `You are an urban climate expert. Analyse this urban zone and give 3 specific green infrastructure interventions.
