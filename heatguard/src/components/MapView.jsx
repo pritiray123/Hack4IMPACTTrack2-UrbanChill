@@ -219,7 +219,7 @@ export default function MapView({ center, zoom, zones, afterMode, onZoneClick, s
       const risk = getRisk(temp);
       const isSelected = selectedZone && selectedZone.id === zone.id;
 
-      if (!selectedZone) {
+      if (!selectedZone || !selectedZone.isCustomPin) {
          if (clickPopupRef.current) {
             map.removeLayer(clickPopupRef.current);
             clickPopupRef.current = null;
@@ -266,7 +266,7 @@ export default function MapView({ center, zoom, zones, afterMode, onZoneClick, s
 
         zoneLayersRef.current.push(marker);
 
-      } else if (activeTab === 'zone') {
+      } else if (activeTab === 'overview' || isSelected) {
         // ── Our colored rectangle for regular grid zones ──────────────────────
         const bounds = [
           [zone.lat - HALF_SPAN, zone.lng - HALF_SPAN],

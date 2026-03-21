@@ -95,6 +95,11 @@ export default function App() {
     setRecLoading(true);
     setRecommendations(null);
 
+    // If the user clicked a regular grid zone, delete any temporary custom pins
+    if (!zone.isCustomPin) {
+      setZones(prev => prev.filter(z => !z.isCustomPin));
+    }
+
     try {
       const recs = await getRecommendations(zone, lang);
       setRecommendations(recs);
