@@ -32,6 +32,20 @@ export default function App() {
 
   const { lang } = React.useContext(LanguageContext) || { lang: 'en' };
   const [lastUpdated, setLastUpdated] = useState(null);
+  
+  // Mobile Responsiveness States
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (!mobile) setSidebarOpen(false);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const fetchCityData = useCallback(async (query) => {
     try {
@@ -284,36 +298,54 @@ export default function App() {
 
   return (
     <div className="app-layout">
-      <TopBar onSearch={handleSearch} stats={stats} loading={loading} />
+      <TopBar 
+        onSearch={handleSearch} 
+        stats={stats} 
+        loading={loading} 
+        isMobile={isMobile}
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+      />
       <div className="main-area">
         <MapView
           center={center}
           zoom={zoom}
           zones={zones}
           afterMode={afterMode}
-          onZoneClick={handleZoneClick}
+          onZoneClick={(z) => {
+            handleZoneClick(z);
+            if (isMobile) setSidebarOpen(true);
+          }}
           selectedZone={selectedZone}
           onMapClick={handleMapClick}
           userLocation={userLocation}
           routeGeoJSON={routeGeoJSON}
           activeTab={activeTab}
         />
-        <Sidebar
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          selectedZone={selectedZone}
-          recommendations={recommendations}
-          recLoading={recLoading}
-          zones={zones}
-          cityName={cityName}
-          onZoneSelect={handleZoneSelectFromOverview}
-          afterMode={afterMode}
-          onPlanRoute={handlePlanRoute}
-          routeLoading={routeLoading}
-          routeAdvisory={routeAdvisory}
-          userLocation={userLocation}
-          onCloseZone={handleCloseZone}
-        />
+        <div className={`sidebar-wrapper ${isMobile ? 'mobile' : ''} ${sidebarOpen ? 'open' : ''}`}>
+          {isMobile && sidebarOpen && (
+            <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+          )}
+          <Sidebar
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            selectedZone={selectedZone}
+            recommendations={recommendations}
+            recLoading={recLoading}
+            zones={zones}
+            cityName={cityName}
+            onZoneSelect={(z) => {
+              handleZoneSelectFromOverview(z);
+              if (isMobile) setSidebarOpen(true);
+            }}
+            afterMode={afterMode}
+            onPlanRoute={handlePlanRoute}
+            routeLoading={routeLoading}
+            routeAdvisory={routeAdvisory}
+            userLocation={userLocation}
+            onCloseZone={handleCloseZone}
+          />
+        </div>
       </div>
       <BottomBar afterMode={afterMode} onToggle={setAfterMode} lastUpdated={lastUpdated} onLocateMe={handleLocateMe} />
       <AuthModal />

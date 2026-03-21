@@ -2,7 +2,7 @@ import React, { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { LanguageContext } from '../context/LanguageContext';
 
-export default function TopBar({ onSearch, stats, loading }) {
+export default function TopBar({ onSearch, stats, loading, isMobile, sidebarOpen, onToggleSidebar }) {
   const [input, setInput] = React.useState('');
   const { user, openAuthModal, logout } = useContext(AuthContext);
   const { lang, setLang, t } = useContext(LanguageContext);
@@ -14,6 +14,15 @@ export default function TopBar({ onSearch, stats, loading }) {
 
   return (
     <div className="topbar">
+      {isMobile && (
+        <button 
+          className="mobile-toggle" 
+          onClick={onToggleSidebar}
+          aria-label="Toggle Sidebar"
+        >
+          {sidebarOpen ? '✕' : '☰'}
+        </button>
+      )}
       <div className="topbar-logo">
         Heat<span>Guard</span>
       </div>
