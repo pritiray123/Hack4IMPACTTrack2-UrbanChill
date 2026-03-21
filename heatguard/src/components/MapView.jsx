@@ -124,6 +124,56 @@ export default function MapView({ center, zoom, zones, afterMode, onZoneClick, s
   const [hoverData, setHoverData] = useState(null);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
 
+  // ── Shared popup logic ────────────────────────────────────────────────────
+  const showLocationCard = React.useCallback(async (lat, lng, showPinMarker = true) => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (clickMarkerRef.current) { map.removeLayer(clickMarkerRef.current); clickMarkerRef.current = null; }
+    if (clickPopupRef.current) { map.removeLayer(clickPopupRef.current); clickPopupRef.current = null; }
+
+    if (showPinMarker) {
+      const pinIcon = L.divIcon({
+        className: '',
+        html: `<div class="click-pin-icon">📍</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+      });
+      clickMarkerRef.current = L.marker([lat, lng], { icon: pinIcon }).addTo(map);
+    }
+
+    const popup = L.popup({
+      className: 'temp-popup-wrapper',
+      closeButton: true,
+      autoClose: false,
+      closeOnClick: false,
+      maxWidth: 290,
+      offset: [0, showPinMarker ? -10 : 0],
+    })
+      .setLatLng([lat, lng])
+      .setContent(buildPopupHTML(null, true))
+      .addTo(map);
+      
+    clickPopupRef.current = popup;
+
+    popup.on('remove', () => {
+      if (clickMarkerRef.current) { map.removeLayer(clickMarkerRef.current); clickMarkerRef.current = null; }
+      if (clickPopupRef.current === popup) clickPopupRef.current = null;
+    });
+
+    try {
+      const resp = await fetch(`http://localhost:5000/api/temperature?lat=${lat}&lng=${lng}`);
+      const data = await resp.json();
+      if (clickPopupRef.current === popup) {
+        clickPopupRef.current.setContent(buildPopupHTML(data, false));
+      }
+    } catch {
+      if (clickPopupRef.current === popup) {
+        clickPopupRef.current.setContent(buildPopupHTML({ error: 'Could not fetch temperature' }, false));
+      }
+    }
+  }, []);
+
   // ── Map initialisation ────────────────────────────────────────────────────
   useEffect(() => {
     if (mapInstanceRef.current) return;
@@ -138,7 +188,7 @@ export default function MapView({ center, zoom, zones, afterMode, onZoneClick, s
     mapInstanceRef.current = map;
 
     // Click-anywhere: show OWM temperature popup card AND call onMapClick for sidebar
-    map.on('click', async (e) => {
+    map.on('click', (e) => {
       const { lat, lng } = e.latlng;
 
       // Always notify App.jsx (sidebar pin zone update)
@@ -147,42 +197,7 @@ export default function MapView({ center, zoom, zones, afterMode, onZoneClick, s
       }
 
       // Always show the OWM temperature popup card with accurate Nominatim location
-      if (clickMarkerRef.current) { map.removeLayer(clickMarkerRef.current); clickMarkerRef.current = null; }
-      if (clickPopupRef.current) { map.removeLayer(clickPopupRef.current); clickPopupRef.current = null; }
-
-      const pinIcon = L.divIcon({
-        className: '',
-        html: `<div class="click-pin-icon">📍</div>`,
-        iconSize: [28, 28],
-        iconAnchor: [14, 28],
-      });
-      clickMarkerRef.current = L.marker([lat, lng], { icon: pinIcon }).addTo(map);
-
-      const popup = L.popup({
-        className: 'temp-popup-wrapper',
-        closeButton: true,
-        autoClose: false,
-        closeOnClick: false,
-        maxWidth: 290,
-        offset: [0, -10],
-      })
-        .setLatLng([lat, lng])
-        .setContent(buildPopupHTML(null, true))
-        .addTo(map);
-      clickPopupRef.current = popup;
-
-      try {
-        const resp = await fetch(`http://localhost:5000/api/temperature?lat=${lat}&lng=${lng}`);
-        const data = await resp.json();
-        if (clickPopupRef.current) clickPopupRef.current.setContent(buildPopupHTML(data, false));
-      } catch {
-        if (clickPopupRef.current) clickPopupRef.current.setContent(buildPopupHTML({ error: 'Could not fetch temperature' }, false));
-      }
-
-      popup.on('remove', () => {
-        if (clickMarkerRef.current) { map.removeLayer(clickMarkerRef.current); clickMarkerRef.current = null; }
-        clickPopupRef.current = null;
-      });
+      showLocationCard(lat, lng, true);
     });
 
     // Hover: show live interpolated data tooltip (teammate feature)
@@ -297,6 +312,8 @@ export default function MapView({ center, zoom, zones, afterMode, onZoneClick, s
         rect.on('click', (e) => {
           L.DomEvent.stopPropagation(e);
           onZoneClick(zone);
+          // Show the location card on the clicked point (without the pin marker)
+          showLocationCard(e.latlng.lat, e.latlng.lng, false);
         });
 
         zoneLayersRef.current.push(rect);
