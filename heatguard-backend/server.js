@@ -445,6 +445,116 @@ app.get('/api/reports/:userId', authenticateToken, async (req, res) => {
   }
 });
 
+// --- REAL-TIME TEMPERATURE BY COORDINATES ---
+
+app.get('/api/temperature', async (req, res) => {
+  try {
+    const { lat, lng } = req.query;
+    if (!lat || !lng) {
+      return res.status(400).json({ error: 'lat and lng query params required' });
+    }
+
+    const parsedLat = parseFloat(lat);
+    const parsedLng = parseFloat(lng);
+
+    if (isNaN(parsedLat) || isNaN(parsedLng)) {
+      return res.status(400).json({ error: 'Invalid lat/lng values' });
+    }
+
+    const OWM_KEY = process.env.OWM_API_KEY ? process.env.OWM_API_KEY.trim() : null;
+
+    // Run OWM + Nominatim reverse geocoding in parallel
+    const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?lat=${parsedLat}&lon=${parsedLng}&format=json&zoom=16&addressdetails=1`;
+
+    const nominatimPromise = fetch(nominatimUrl, {
+      headers: { 'User-Agent': 'HeatGuard/1.0 (urban heat monitoring app)' }
+    }).then(r => r.json()).catch(() => null);
+
+    if (OWM_KEY && OWM_KEY !== 'your_openweathermap_key_here' && OWM_KEY !== '') {
+      console.log(`[/api/temperature] Using OWM live data for ${parsedLat},${parsedLng}`);
+
+      const [owmRes, nominatimData] = await Promise.all([
+        fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${parsedLat}&lon=${parsedLng}&appid=${OWM_KEY}&units=metric`),
+        nominatimPromise
+      ]);
+
+      console.log(`[/api/temperature] OWM response status: ${owmRes.status}`);
+
+      if (!owmRes.ok) {
+        const errText = await owmRes.text();
+        console.error(`[/api/temperature] OWM API error: ${owmRes.status} ${errText}`);
+        throw new Error(`OWM error: ${owmRes.status} ${errText}`);
+      }
+
+      const owmData = await owmRes.json();
+      console.log(`[/api/temperature] OWM success: ${owmData.main?.temp}°C at ${owmData.name}`);
+
+      // Build precise location name from Nominatim
+      let locationName = owmData.name || '';
+      let country = owmData.sys?.country || '';
+      if (nominatimData && nominatimData.address) {
+        const addr = nominatimData.address;
+        // Pick most precise available label: neighbourhood > suburb > quarter > village > town > city
+        locationName = addr.neighbourhood || addr.suburb || addr.quarter || addr.village || addr.town || addr.city || addr.county || owmData.name || '';
+        country = addr.country_code ? addr.country_code.toUpperCase() : country;
+      }
+
+
+
+      return res.json({
+        lat: parsedLat,
+        lng: parsedLng,
+        temp: Math.round(owmData.main.temp * 10) / 10,
+        feelsLike: Math.round(owmData.main.feels_like * 10) / 10,
+        humidity: owmData.main.humidity,
+        windSpeed: Math.round(owmData.wind.speed * 3.6 * 10) / 10, // m/s → km/h
+        description: owmData.weather[0].description,
+        icon: owmData.weather[0].icon,
+        locationName: locationName || owmData.name || 'Unknown',
+        country: country || owmData.sys?.country || '',
+        realtime: true,
+      });
+    }
+
+    // --- Fallback: estimated temp + Nominatim for location name ---
+    const [nominatimFallback, ] = await Promise.all([nominatimPromise]);
+    const seed = Math.sin(parsedLat * 127.3 + parsedLng * 311.7) * 10000;
+    const pseudo = seed - Math.floor(seed);
+    const now = new Date();
+    const timeOscillation = Math.sin(now.getMinutes() / 10) * 2;
+    const latFactor = Math.max(0, (30 - Math.abs(parsedLat)) / 30);
+    const estimatedTemp = +(28 + latFactor * 12 + pseudo * 6 + timeOscillation).toFixed(1);
+    const estimatedHumidity = Math.round(40 + pseudo * 50);
+    const estimatedWind = +(5 + pseudo * 20).toFixed(1);
+
+    // Get location name from Nominatim even for fallback
+    let fallbackLocation = 'Unknown location';
+    let fallbackCountry = '';
+    if (nominatimFallback && nominatimFallback.address) {
+      const addr = nominatimFallback.address;
+      fallbackLocation = addr.neighbourhood || addr.suburb || addr.quarter || addr.village || addr.town || addr.city || addr.county || 'Unknown';
+      fallbackCountry = addr.country_code ? addr.country_code.toUpperCase() : '';
+    }
+
+    return res.json({
+      lat: parsedLat,
+      lng: parsedLng,
+      temp: estimatedTemp,
+      feelsLike: +(estimatedTemp + (estimatedHumidity > 70 ? 2 : -1)).toFixed(1),
+      humidity: estimatedHumidity,
+      windSpeed: estimatedWind,
+      description: estimatedTemp > 38 ? 'hot and humid' : estimatedTemp > 32 ? 'warm and sunny' : 'partly cloudy',
+      icon: estimatedTemp > 35 ? '01d' : '02d',
+      locationName: fallbackLocation,
+      country: fallbackCountry,
+      realtime: false,
+    });
+  } catch (error) {
+    console.error('/api/temperature error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Initialize DB and Start Server
 initDB().then(() => {
   app.listen(PORT, () => {
