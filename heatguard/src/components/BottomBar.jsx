@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useContext } from 'react';
+import { LanguageContext } from '../context/LanguageContext';
 
 export default function BottomBar({ afterMode, onToggle, lastUpdated, onLocateMe }) {
+  const { t } = useContext(LanguageContext);
   const getMinutesAgo = () => {
     if (!lastUpdated) return '';
     const diff = Math.floor((new Date() - lastUpdated) / 60000);
@@ -16,14 +18,14 @@ export default function BottomBar({ afterMode, onToggle, lastUpdated, onLocateMe
           onClick={() => onToggle(false)}
           id="toggle-current"
         >
-          Current
+          {t('current')}
         </button>
         <button
           className={`toggle-btn ${afterMode ? 'active' : ''}`}
           onClick={() => onToggle(true)}
           id="toggle-after"
         >
-          After Interventions
+          {t('after_interventions')}
         </button>
       </div>
 
@@ -34,18 +36,18 @@ export default function BottomBar({ afterMode, onToggle, lastUpdated, onLocateMe
           style={{ background: 'var(--info)', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 12px' }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
-          Locate Me
+          {t('locate_me')}
         </button>
       )}
       </div>
 
       <span className="bottombar-note">
         {afterMode
-          ? '🌿 Showing projected temperatures after green interventions (18% avg reduction)'
-          : '📡 Showing current surface temperature data'}
+          ? `🌿 ${t('showing_projected')}`
+          : `📡 ${t('showing_current')}`}
         {lastUpdated && !afterMode && (
           <span style={{ marginLeft: '10px', color: 'var(--accent)', opacity: 0.8 }}>
-            (Last updated: {getMinutesAgo()})
+            ({t('last_updated')}: {getMinutesAgo()})
           </span>
         )}
       </span>

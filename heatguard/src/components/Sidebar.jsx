@@ -53,7 +53,7 @@ export default function Sidebar({
           onClick={() => onTabChange('route')}
           id="tab-route"
         >
-          Route
+          {t('route')}
         </button>
       </div>
 
