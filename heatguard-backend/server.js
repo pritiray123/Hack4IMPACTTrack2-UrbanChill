@@ -74,109 +74,111 @@ app.post('/api/auth/login', async (req, res) => {
 // --- CLAUDE PROXY ENDPOINT ---
 
 function getDetailedMockRecommendations(zone, risk) {
+  // Generate a pseudo-random seed based on zone properties to ensure variation but consistency per zone
+  const seed = zone.name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) + Math.floor(zone.temp) + zone.aqi + zone.greenCover;
+  
+  const pseudoRand = (n) => {
+    const x = Math.sin(seed * 9301 + n * 49297) * 10000;
+    return x - Math.floor(x);
+  };
+
   const reductionMap = {
-    LOW: "−1.4°C",
-    MODERATE: "−2.6°C",
-    HIGH: "−3.8°C",
-    CRITICAL: "−4.9°C",
+    LOW: `−${(1.0 + pseudoRand(1) * 0.8).toFixed(1)}°C`,
+    MODERATE: `−${(2.0 + pseudoRand(2) * 1.5).toFixed(1)}°C`,
+    HIGH: `−${(3.5 + pseudoRand(3) * 1.5).toFixed(1)}°C`,
+    CRITICAL: `−${(4.5 + pseudoRand(4) * 2.0).toFixed(1)}°C`,
   };
 
-  const interventionSets = {
-    Residential: [
-      {
-        type: "TREES",
-        action: `Plant 200 fast-growing native trees (Neem, Peepal, Banyan) along the main residential arterials in ${zone.name}`,
-        impact: `−1.5°C avg surface temp, ${Math.round(zone.density * 0.09).toLocaleString()} residents benefited`,
-      },
-      {
-        type: "ROOFTOP GARDEN",
-        action: `Convert 35% of flat concrete rooftops in ${zone.name} to green roofs with drought-resistant vegetation`,
-        impact: `−1.2°C surface temp, reduces urban runoff by 55%`,
-      },
-      {
-        type: "COOL PAVEMENT",
-        action: `Replace 2 km of dark asphalt on main roads with high-albedo reflective cool pavement`,
-        impact: `−0.9°C local temp, 30% less heat absorption during peak hours`,
-      },
-    ],
-    Commercial: [
-      {
-        type: "GREEN WALL",
-        action: `Install vertical green walls on south-facing facades of the 5 largest commercial buildings in ${zone.name}`,
-        impact: `−1.3°C facade surface temp, improves pedestrian comfort index by 40%`,
-      },
-      {
-        type: "COOL PAVEMENT",
-        action: `Apply cool pavement coating across the main commercial street and parking areas`,
-        impact: `−1.1°C local ambient temp, reduces heat absorption by 35%`,
-      },
-      {
-        type: "WATER FEATURE",
-        action: `Install evaporative cooling mist systems at 4 high-footfall intersections in the commercial zone`,
-        impact: `−2°C localised cooling, benefits ${Math.round(zone.density * 0.05).toLocaleString()} daily commuters`,
-      },
-    ],
-    Industrial: [
-      {
-        type: "GREEN WALL",
-        action: `Cover perimeter walls of industrial units in ${zone.name} with climbing vegetation and modular green panels`,
-        impact: `−1.4°C surface temp, absorbs 20% of local particulate matter`,
-      },
-      {
-        type: "TREES",
-        action: `Plant a 15m wide tree buffer belt along the industrial zone boundary facing residential areas`,
-        impact: `−1.8°C temp at zone boundary, reduces AQI exposure for ${Math.round(zone.density * 0.12).toLocaleString()} residents`,
-      },
-      {
-        type: "ROOFTOP GARDEN",
-        action: `Convert flat industrial rooftops to solar-green hybrid roofs combining PV panels and sedum vegetation`,
-        impact: `−1.0°C surface temp, generates renewable energy reducing heat-generating activity`,
-      },
-    ],
-    "Mixed Use": [
-      {
-        type: "PARK",
-        action: `Develop a 2-hectare pocket park with native trees and water bodies at the centre of ${zone.name}`,
-        impact: `−2.0°C within 300m radius, creates green corridor for ${Math.round(zone.density * 0.15).toLocaleString()} residents`,
-      },
-      {
-        type: "COOL PAVEMENT",
-        action: `Retrofit all pedestrian walkways and plazas in ${zone.name} with light-coloured permeable paving`,
-        impact: `−0.8°C local temp, 25% reduction in surface heat retention`,
-      },
-      {
-        type: "TREES",
-        action: `Plant 150 shade trees with continuous tree canopy coverage along the mixed-use main street`,
-        impact: `−1.6°C under canopy, reduces pedestrian heat stress index by 45%`,
-      },
-    ],
-    "Green Space": [
-      {
-        type: "WATER FEATURE",
-        action: `Add seasonal water bodies and misting walkways throughout the existing green space in ${zone.name}`,
-        impact: `−1.5°C ambient temp, extends usable hours by 3hrs during peak summer`,
-      },
-      {
-        type: "TREES",
-        action: `Increase canopy density by planting 100 additional large-canopy native trees in sparse areas`,
-        impact: `−1.2°C avg temp, improves biodiversity and carbon sequestration`,
-      },
-      {
-        type: "COOL PAVEMENT",
-        action: `Replace existing paths with permeable cool paving to reduce runoff and surface heat`,
-        impact: `−0.6°C path surface temp, 40% better rainwater absorption`,
-      },
-    ],
-  };
+  let allInterventions = [];
 
-  const interventions = interventionSets[zone.landUse] || interventionSets["Mixed Use"];
+  // 1. Temperature-based Interventions
+  if (zone.temp > 38) {
+    allInterventions.push({
+      type: "WATER FEATURE",
+      action: `Install high-efficiency evaporative misting systems at ${Math.floor(2 + pseudoRand(5)*5)} major public squares in ${zone.name} to combat the extreme ${zone.temp}°C heat.`,
+      impact: `−2.5°C localised cooling during peak afternoon hours.`
+    });
+    allInterventions.push({
+      type: "COOL PAVEMENT",
+      action: `Apply solar-reflective coatings on ${Math.floor(15 + pseudoRand(6)*25)}% of exposed asphalt roads in the ${zone.landUse.toLowerCase()} sectors.`,
+      impact: `Reduces surface temperature by up to 5°C, lowering ambient heat.`
+    });
+  } else {
+    allInterventions.push({
+      type: "COOL PAVEMENT",
+      action: `Retrofit pedestrian walkways in ${zone.name} with light-coloured, permeable paving to reduce surface heat retention.`,
+      impact: `−0.8°C local temp, 25% reduction in surface heat retention.`
+    });
+  }
+
+  // 2. AQI & Pollution-based Interventions
+  if (zone.aqi > 150) {
+    allInterventions.push({
+      type: "GREEN WALL",
+      action: `Construct vertical moss and ivy green walls on ${Math.floor(5 + pseudoRand(7)*10)} major ${zone.landUse.toLowerCase()} buildings to filter out PM2.5 from the severe ${zone.aqi} AQI air.`,
+      impact: `Absorbs 30% of local particulate matter, −1.5°C facade temp.`
+    });
+    allInterventions.push({
+      type: "TREES",
+      action: `Plant a dense buffer belt of ${Math.floor(150 + pseudoRand(8)*250)} native pollution-absorbing trees (like Neem and Peepal) along high-traffic corridors.`,
+      impact: `Improves respiratory health for ${Math.round(zone.density * 0.15).toLocaleString()} nearby residents.`
+    });
+  } else {
+    allInterventions.push({
+      type: "TREES",
+      action: `Increase canopy density by planting ${Math.floor(50 + pseudoRand(9)*100)} large-canopy native shade trees scattered across ${zone.name}.`,
+      impact: `−1.2°C avg temp under canopy, improves local biodiversity.`
+    });
+  }
+
+  // 3. Green Cover-based Interventions
+  if (zone.greenCover < 15) {
+    allInterventions.push({
+      type: "ROOFTOP GARDEN",
+      action: `Mandate the conversion of 40% of flat concrete roofs in this low-vegetation zone (only ${zone.greenCover}% green cover) to drought-resistant green roofs.`,
+      impact: `−1.2°C building surface temp, drastically reduces urban runoff.`
+    });
+    allInterventions.push({
+      type: "PARK",
+      action: `Reclaim abandoned plots to develop ${Math.floor(1 + pseudoRand(10)*3)} pocket parks with native shrubs at the centre of ${zone.name}.`,
+      impact: `−2.0°C within 300m radius, creating vital green corridors.`
+    });
+  } else {
+    allInterventions.push({
+      type: "WATER FEATURE",
+      action: `Add seasonal water bodies and shaded resting pavilions throughout the existing green spaces in ${zone.name}.`,
+      impact: `−1.5°C ambient temp around the water bodies.`
+    });
+  }
+
+  // Mix LandUse-specific Items
+  if (zone.landUse === 'Industrial') {
+    allInterventions.push({
+      type: "ROOFTOP GARDEN",
+      action: `Deploy solar-green hybrid roofs combining PV panels and sedum vegetation over massive industrial sheds in ${zone.name}.`,
+      impact: `Generates renewable energy while providing −1.0°C surface cooling.`
+    });
+  } else if (zone.landUse === 'Residential') {
+     allInterventions.push({
+      type: "TREES",
+      action: `Distribute ${Math.floor(500 + pseudoRand(13)*300)} native saplings to households in ${zone.name} to plant in private courtyards and along residential streets.`,
+      impact: `Fosters community ownership, −1.5°C ambient cooling at block level.`
+    });
+  }
+
+  // Safely random-sort the accumulated interventions using our pseudo-random generator
+  // This ensures the same zone gets the same interventions each time, but different zones get different mixes
+  const shuffled = allInterventions.sort((a, b) => pseudoRand(a.type.charCodeAt(0)) - 0.5);
+  const selectedInterventions = shuffled.slice(0, 3);
+
+  const priorityLevel = risk.label === "LOW" ? "LOW" : risk.label === "MODERATE" ? "MEDIUM" : "HIGH";
 
   return {
-    interventions,
-    summary: `${zone.name} is experiencing ${risk.label.toLowerCase()} heat stress with only ${zone.greenCover}% green cover and a surface temperature of ${zone.temp}°C. The most urgent intervention is ${interventions[0].type.toLowerCase()} deployment to achieve immediate cooling relief.`,
+    interventions: selectedInterventions,
+    summary: `${zone.name} is facing ${risk.label.toLowerCase()} heat stress, exacerbated by its current weather profile (${zone.temp}°C, AQI: ${zone.aqi}). Given its status as a ${zone.landUse} area with ${zone.greenCover}% green cover, the most urgent priority is deploying ${selectedInterventions[0].type.toLowerCase()} to provide immediate climatic relief to the community.`,
     projected_temp_reduction: reductionMap[risk.label] || "−2.5°C",
-    priority: risk.label === "LOW" ? "LOW" : risk.label === "MODERATE" ? "MEDIUM" : "HIGH",
-    residents_benefited: Math.round(zone.density * 0.2),
+    priority: priorityLevel,
+    residents_benefited: Math.round(zone.density * (0.1 + pseudoRand(12)*0.2)),
   };
 }
 
@@ -390,12 +392,33 @@ function generateZones(cityKey, centerLat, centerLng, baseTempOffset = 0) {
 
 app.get('/api/city/:name', async (req, res) => {
   try {
-    const cityName = req.params.name.trim().toLowerCase();
-    const config = CITY_CONFIGS[cityName];
+    const query = req.params.name.trim();
     
-    if (!config) {
-      return res.status(404).json({ error: 'City not found or supported' });
+    // Geocode the query using Nominatim OpenStreetMap API
+    const geocodeRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`, {
+      headers: { 'User-Agent': 'HeatGuard-Local-App' } // Nominatim requires a user-agent
+    });
+    
+    const geocodeData = await geocodeRes.json();
+    
+    if (!geocodeData || geocodeData.length === 0) {
+      return res.status(404).json({ error: 'Location not found via Geocoding.' });
     }
+    
+    const lat = parseFloat(geocodeData[0].lat);
+    const lng = parseFloat(geocodeData[0].lon);
+    
+    // Simplify name (e.g., "Pune, Maharashtra, India" -> "Pune")
+    const fullDisplayName = geocodeData[0].display_name;
+    const displayName = fullDisplayName.split(',')[0].trim();
+    
+    const config = {
+      name: displayName,
+      fullName: fullDisplayName,
+      lat,
+      lng,
+      zoom: 12
+    };
 
     let baseTempOffset = 0;
     const OWM_KEY = process.env.OWM_API_KEY;
@@ -414,7 +437,8 @@ app.get('/api/city/:name', async (req, res) => {
       }
     }
 
-    const zones = generateZones(cityName, config.lat, config.lng, baseTempOffset);
+    // Generate grid based on the dynamically found coordinates and name
+    const zones = generateZones(displayName.toLowerCase(), config.lat, config.lng, baseTempOffset);
     
     res.json({
       config,
@@ -423,6 +447,55 @@ app.get('/api/city/:name', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/pin', async (req, res) => {
+  try {
+    const { lat, lng } = req.body;
+    
+    // Call Open-Meteo for free real weather (including humidity)
+    const meteoRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m&timezone=auto`);
+    const meteoData = await meteoRes.json();
+    
+    // Call Open-Meteo for free real Air Quality (AQI)
+    const aqiRes = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&current=european_aqi&timezone=auto`);
+    const aqiData = await aqiRes.json();
+    
+    if (!meteoData || !meteoData.current) {
+      return res.status(400).json({ error: 'Could not fetch real weather data for this pin' });
+    }
+    
+    const currentTemp = meteoData.current.temperature_2m;
+    const currentHumidity = meteoData.current.relative_humidity_2m;
+    
+    // Fallback to 50 if AQI API fails or area unsupported
+    const currentAqi = (aqiData && aqiData.current && aqiData.current.european_aqi) ? aqiData.current.european_aqi : 50;
+    
+    // Generate a pseudo-random seed to keep density/greenCover stable for identical coords
+    const pseudoRand = (n) => {
+      const x = Math.sin((lat + lng) * 9301 + n * 49297) * 10000;
+      return x - Math.floor(x);
+    };
+
+    const zone = {
+      id: `pin_${lat.toFixed(4)}_${lng.toFixed(4)}`,
+      name: "Custom Dropped Pin",
+      lat,
+      lng,
+      temp: currentTemp,
+      greenCover: Math.floor(5 + pseudoRand(1) * 35),
+      density: Math.floor(1000 + pseudoRand(2) * 15000),
+      aqi: currentAqi,
+      humidity: currentHumidity,
+      landUse: "Mixed Use",
+      isCustomPin: true
+    };
+    
+    res.json(zone);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error fetching pin data' });
   }
 });
 

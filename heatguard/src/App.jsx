@@ -26,12 +26,18 @@ export default function App() {
   const { lang } = React.useContext(LanguageContext) || { lang: 'en' };
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  const fetchCityData = useCallback(async (city) => {
+  const fetchCityData = useCallback(async (query) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/city/${city.key}`);
-      if (!res.ok) throw new Error('Failed to load city data');
+      const res = await fetch(`http://localhost:5000/api/city/${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error('Failed to load location data from server.');
       const data = await res.json();
+      
       const newZones = data.zones;
+      const config = data.config;
+      
+      setCityName(config.name);
+      setCenter({ lat: config.lat, lng: config.lng });
+      setZoom(config.zoom || 12);
       
       setZones(newZones);
       setLastUpdated(new Date());
@@ -46,39 +52,38 @@ export default function App() {
       ).toFixed(1);
 
       setStats({ avgTemp, maxTemp, atRiskZones, avgGreenCover });
+      return true;
     } catch (err) {
       console.error(err);
+      alert(`Could not pinpoint data for: "${query}". Try adding more details like "City, Country".`);
+      return false;
     }
   }, []);
 
   const handleSearch = useCallback(async (input) => {
-    const city = resolveCity(input);
-    if (!city) {
-      alert(`City "${input}" not found. Try: Mumbai, Delhi, Chennai, Bangalore, Hyderabad, Kolkata, or Bhubaneswar.`);
-      return;
-    }
-
+    if (!input || !input.trim()) return;
+    
     setLoading(true);
-    setCityName(city.name);
-    setCenter({ lat: city.lat, lng: city.lng });
-    setZoom(city.zoom);
     setSelectedZone(null);
     setRecommendations(null);
     setAfterMode(false);
 
-    await fetchCityData(city);
+    await fetchCityData(input.trim());
     setLoading(false);
   }, [fetchCityData]);
+
+  // Initial Data Load
+  React.useEffect(() => {
+    handleSearch('Mumbai');
+  }, [handleSearch]);
 
   // Polling Effect
   React.useEffect(() => {
     if (!cityName) return;
-    const city = resolveCity(cityName);
-    if (!city) return;
 
     // Poll every 5 minutes (300000 ms)
     const intervalId = setInterval(() => {
-      fetchCityData(city);
+      fetchCityData(cityName);
     }, 300000);
 
     return () => clearInterval(intervalId);
@@ -106,6 +111,31 @@ export default function App() {
     handleZoneClick(zone);
   }, [handleZoneClick]);
 
+  const handleMapClick = useCallback(async (lat, lng) => {
+    try {
+      setLoading(true);
+      const res = await fetch('http://localhost:5000/api/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat, lng })
+      });
+      if (!res.ok) throw new Error('Failed to create pin');
+      const pinZone = await res.json();
+      
+      setZones(prev => {
+        const withoutOldPins = prev.filter(z => !z.isCustomPin);
+        return [...withoutOldPins, pinZone];
+      });
+      
+      handleZoneClick(pinZone);
+    } catch (err) {
+      console.error(err);
+      alert('Could not fetch real weather for this pin.');
+    } finally {
+      setLoading(false);
+    }
+  }, [handleZoneClick]);
+
   return (
     <div className="app-layout">
       <TopBar onSearch={handleSearch} stats={stats} loading={loading} />
@@ -117,6 +147,7 @@ export default function App() {
           afterMode={afterMode}
           onZoneClick={handleZoneClick}
           selectedZone={selectedZone}
+          onMapClick={handleMapClick}
         />
         <Sidebar
           activeTab={activeTab}
