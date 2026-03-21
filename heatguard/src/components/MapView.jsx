@@ -12,7 +12,7 @@ const TILE_OPTS = {
 
 const HEAT_GRADIENT = { 0.2: '#1a472a', 0.4: '#d29922', 0.65: '#f85149', 1.0: '#ff006e' };
 
-export default function MapView({ center, zoom, zones, afterMode, onZoneClick, selectedZone, onMapClick }) {
+export default function MapView({ center, zoom, zones, afterMode, onZoneClick, selectedZone, onMapClick, userLocation }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const heatLayerRef = useRef(null);
@@ -20,6 +20,7 @@ export default function MapView({ center, zoom, zones, afterMode, onZoneClick, s
   const prevZonesRef = useRef([]);
   const onMapClickRef = useRef(onMapClick);
   const zonesRef = useRef(zones);
+  const userMarkerRef = useRef(null);
 
   const [hoverData, setHoverData] = useState(null);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
@@ -87,10 +88,28 @@ export default function MapView({ center, zoom, zones, afterMode, onZoneClick, s
     };
   }, []);
 
+  // Update user location marker
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !userLocation) return;
+
+    if (!userMarkerRef.current) {
+      const userIcon = L.divIcon({
+        html: `<div style="width: 16px; height: 16px; background-color: #388bfd; border: 3px solid #0d1117; border-radius: 50%; box-shadow: 0 0 8px rgba(56,139,253,0.8);"></div>`,
+        className: 'user-location-icon',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      });
+      userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 1000 }).addTo(map);
+    } else {
+      userMarkerRef.current.setLatLng([userLocation.lat, userLocation.lng]);
+    }
+  }, [userLocation]);
+
   // Update view when center/zoom changes
   useEffect(() => {
     if (!mapInstanceRef.current) return;
-    mapInstanceRef.current.setView([center.lat, center.lng], zoom, { animate: true });
+    mapInstanceRef.current.flyTo([center.lat, center.lng], zoom, { duration: 1.5 });
   }, [center, zoom]);
 
   // Update heatmap and markers when zones or afterMode changes
@@ -163,20 +182,20 @@ export default function MapView({ center, zoom, zones, afterMode, onZoneClick, s
       // Static Board Content
       const boardContent = `
         <div style="min-width: 140px; padding: 2px;">
-          <div style="font-weight: bold; font-size: 14px; margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 4px;">
+          <div style="font-weight: bold; font-size: 14px; margin-bottom: 6px; border-bottom: 1px solid rgba(0,0,0,0.15); padding-bottom: 4px; color: #111;">
             📍 ${zone.name}
           </div>
           <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 3px;">
-            <span style="color: #a1a1aa;">Temp:</span>
-            <span style="color: var(--warn); font-weight: bold;">${temp}°C</span>
+            <span style="color: #666;">Temp:</span>
+            <span style="color: #d29922; font-weight: bold;">${temp}°C</span>
           </div>
           <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 3px;">
-            <span style="color: #a1a1aa;">AQI:</span>
-            <span style="color: var(--danger); font-weight: bold;">${zone.aqi}</span>
+            <span style="color: #666;">AQI:</span>
+            <span style="color: #f85149; font-weight: bold;">${zone.aqi}</span>
           </div>
           <div style="display: flex; justify-content: space-between; font-size: 13px;">
-            <span style="color: #a1a1aa;">Greenery:</span>
-            <span style="color: var(--accent); font-weight: bold;">${zone.greenCover}%</span>
+            <span style="color: #666;">Greenery:</span>
+            <span style="color: #2ea043; font-weight: bold;">${zone.greenCover}%</span>
           </div>
         </div>
       `;

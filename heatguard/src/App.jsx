@@ -22,6 +22,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('zone');
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationPromptOpen, setLocationPromptOpen] = useState(false);
 
   const { lang } = React.useContext(LanguageContext) || { lang: 'en' };
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -37,7 +39,7 @@ export default function App() {
       
       setCityName(config.name);
       setCenter({ lat: config.lat, lng: config.lng });
-      setZoom(config.zoom || 12);
+      setZoom(13);
       
       setZones(newZones);
       setLastUpdated(new Date());
@@ -72,9 +74,52 @@ export default function App() {
     setLoading(false);
   }, [fetchCityData]);
 
-  // Initial Data Load
+  // Initial Location & Data Load
   React.useEffect(() => {
-    handleSearch('Mumbai');
+    let watchId;
+    let initialLoadDone = false;
+
+    if (!navigator.geolocation) {
+      setLocationPromptOpen(true);
+      handleSearch('Mumbai');
+      return;
+    }
+
+    watchId = navigator.geolocation.watchPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setUserLocation({ lat: latitude, lng: longitude });
+
+        if (!initialLoadDone) {
+          initialLoadDone = true;
+          // Reverse geocode to get city name
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`, {
+              headers: { 'User-Agent': 'HeatGuard-Local-App' }
+            });
+            const data = await res.json();
+            const city = data.address?.city || data.address?.town || data.address?.county || data.address?.state_district || 'Mumbai';
+            handleSearch(city);
+          } catch (err) {
+            console.error("Reverse geocoding failed", err);
+            handleSearch('Mumbai');
+          }
+        }
+      },
+      (error) => {
+        console.error("Location error:", error);
+        setLocationPromptOpen(true);
+        if (!initialLoadDone) {
+          initialLoadDone = true;
+          handleSearch('Mumbai'); // fallback
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 }
+    );
+
+    return () => {
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+    };
   }, [handleSearch]);
 
   // Polling Effect
@@ -136,6 +181,32 @@ export default function App() {
     }
   }, [handleZoneClick]);
 
+  const handleLocateMe = useCallback(() => {
+    if (userLocation) {
+      // Create a new object reference so the MapView useEffect always triggers
+      setCenter({ lat: userLocation.lat, lng: userLocation.lng });
+      setZoom(prev => prev === 14 ? 14.0001 : 14); // Toggle slightly to force zoom re-render if needed
+    } else {
+      setLoading(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation({ lat: latitude, lng: longitude });
+          setCenter({ lat: latitude, lng: longitude });
+          setZoom(14);
+          setLoading(false);
+          setLocationPromptOpen(false);
+        },
+        (error) => {
+          console.error("Locate Me manual fetch error:", error);
+          setLoading(false);
+          setLocationPromptOpen(true);
+        },
+        { enableHighAccuracy: true, timeout: 30000 }
+      );
+    }
+  }, [userLocation]);
+
   return (
     <div className="app-layout">
       <TopBar onSearch={handleSearch} stats={stats} loading={loading} />
@@ -148,6 +219,7 @@ export default function App() {
           onZoneClick={handleZoneClick}
           selectedZone={selectedZone}
           onMapClick={handleMapClick}
+          userLocation={userLocation}
         />
         <Sidebar
           activeTab={activeTab}
@@ -161,8 +233,21 @@ export default function App() {
           afterMode={afterMode}
         />
       </div>
-      <BottomBar afterMode={afterMode} onToggle={setAfterMode} lastUpdated={lastUpdated} />
+      <BottomBar afterMode={afterMode} onToggle={setAfterMode} lastUpdated={lastUpdated} onLocateMe={handleLocateMe} />
       <AuthModal />
+      {locationPromptOpen && (
+        <div className="location-modal-overlay">
+          <div className="location-modal">
+            <h3 style={{ marginBottom: "10px", color: "var(--accent)" }}>Location Access Required</h3>
+            <p style={{ marginBottom: "15px", fontSize: "14px", lineHeight: "1.5" }}>
+              Please enable location services on your device and browser to use live tracking and view your local climate risks.
+            </p>
+            <button className="btn" onClick={() => setLocationPromptOpen(false)}>
+              Continue without location
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

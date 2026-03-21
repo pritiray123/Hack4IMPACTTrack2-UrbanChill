@@ -341,7 +341,7 @@ const GENERIC_ZONE_PREFIXES = [
   'Mall', 'Bridge', 'Colony', 'Nagar', 'Bazaar'
 ];
 
-function generateZones(cityKey, centerLat, centerLng, baseTempOffset = 0) {
+function generateZones(cityKey, centerLat, centerLng) {
   const zones = [];
   const GRID = 5;
   const SPREAD = 0.06;
@@ -349,8 +349,6 @@ function generateZones(cityKey, centerLat, centerLng, baseTempOffset = 0) {
   const startLng = centerLng - (GRID / 2) * SPREAD;
 
   const seed = cityKey.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-  const now = new Date();
-  const timeOffset = Math.sin(now.getMinutes() / 5) * 2; // oscillates ±2 degrees every 5 mins
   const cityNamesList = CITY_ZONE_NAMES[cityKey] || GENERIC_ZONE_PREFIXES;
 
   for (let row = 0; row < GRID; row++) {
@@ -363,12 +361,9 @@ function generateZones(cityKey, centerLat, centerLng, baseTempOffset = 0) {
 
       const lat = startLat + row * SPREAD + (pseudoRand(1) - 0.5) * 0.01;
       const lng = startLng + col * SPREAD + (pseudoRand(2) - 0.5) * 0.01;
-      // base temp + randomized local offset + live time oscillation + OWM base offset
-      const temp = +(28 + pseudoRand(3) * 16 + timeOffset + baseTempOffset).toFixed(1);
+      
       const greenCover = +(5 + pseudoRand(4) * 55).toFixed(1);
       const density = Math.round(3000 + pseudoRand(5) * 45000);
-      const aqi = Math.round(40 + pseudoRand(6) * 180 + Math.random() * 5); // Slight live jitter
-      const humidity = Math.round(30 + pseudoRand(7) * 60);
       const landUse = LAND_USES[Math.floor(pseudoRand(8) * LAND_USES.length)];
       
       const zoneName = cityNamesList[idx % cityNamesList.length];
@@ -378,12 +373,12 @@ function generateZones(cityKey, centerLat, centerLng, baseTempOffset = 0) {
         name: zoneName,
         lat,
         lng,
-        temp,
         greenCover,
         density,
-        aqi,
-        humidity,
         landUse,
+        temp: 25, // default fallback
+        aqi: 50,  // default fallback
+        humidity: 50 // default fallback
       });
     }
   }
@@ -395,7 +390,8 @@ app.get('/api/city/:name', async (req, res) => {
     const query = req.params.name.trim();
     
     // Geocode the query using Nominatim OpenStreetMap API
-    const geocodeRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`, {
+    // Added countrycodes=in to heavily bias results for Indian cities
+    const geocodeRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=in&format=json&limit=1`, {
       headers: { 'User-Agent': 'HeatGuard-Local-App' } // Nominatim requires a user-agent
     });
     
@@ -420,26 +416,45 @@ app.get('/api/city/:name', async (req, res) => {
       zoom: 12
     };
 
-    let baseTempOffset = 0;
-    const OWM_KEY = process.env.OWM_API_KEY;
-    
-    if (OWM_KEY && OWM_KEY !== 'your_openweathermap_key_here') {
-      try {
-        const owmRes = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${config.lat}&lon=${config.lng}&appid=${OWM_KEY}&units=metric`);
-        if (owmRes.ok) {
-          const owmData = await owmRes.json();
-          const currentTemp = owmData.main.temp;
-          // Calculate an offset so the average of the grid roughly matches the current temp
-          baseTempOffset = currentTemp - 36; // 36 is roughly the unshifted average (28 + 16/2)
+    // Generate grid coordinates
+    const zones = generateZones(displayName.toLowerCase(), config.lat, config.lng);
+    const lats = zones.map(z => z.lat).join(',');
+    const lngs = zones.map(z => z.lng).join(',');
+
+    try {
+      // Fetch real weather data for ALL 25 zones in parallel
+      const [weatherRes, aqiRes] = await Promise.all([
+        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lngs}&current=temperature_2m,relative_humidity_2m&timezone=auto`),
+        fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lngs}&current=european_aqi&timezone=auto`)
+      ]);
+
+      const weatherData = await weatherRes.json();
+      const aqiData = await aqiRes.json();
+
+      // Populate zones with real data
+      zones.forEach((zone, i) => {
+        if (Array.isArray(weatherData) && weatherData[i] && weatherData[i].current) {
+          zone.temp = weatherData[i].current.temperature_2m || 25;
+          zone.humidity = weatherData[i].current.relative_humidity_2m || 50;
+        } else if (weatherData.current) { // Fallback if single element
+          zone.temp = weatherData.current.temperature_2m || 25;
+          zone.humidity = weatherData.current.relative_humidity_2m || 50;
         }
-      } catch (err) {
-        console.error('Failed to fetch OWM data, using fallback logic', err);
-      }
+
+        if (Array.isArray(aqiData) && aqiData[i] && aqiData[i].current && aqiData[i].current.european_aqi !== null) {
+          zone.aqi = aqiData[i].current.european_aqi;
+        } else if (aqiData.current && aqiData.current.european_aqi !== null) { // Fallback if single element
+          zone.aqi = aqiData.current.european_aqi;
+        } else {
+          // Fallback AQI if entirely missing
+          zone.aqi = Math.round(50 + (zone.temp > 30 ? (zone.temp - 30) * 5 : 0) + Math.random() * 20);
+        }
+      });
+    } catch (apiErr) {
+      console.error('Failed to fetch real data for grid, using fallback', apiErr);
+      // Fallbacks are already set in generateZones
     }
 
-    // Generate grid based on the dynamically found coordinates and name
-    const zones = generateZones(displayName.toLowerCase(), config.lat, config.lng, baseTempOffset);
-    
     res.json({
       config,
       zones
