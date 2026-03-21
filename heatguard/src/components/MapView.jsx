@@ -221,12 +221,12 @@ export default function MapView({ center, zoom, zones, afterMode, onZoneClick, s
 
     if (!userMarkerRef.current) {
       const userIcon = L.divIcon({
-        html: `<div style="width: 16px; height: 16px; background-color: #388bfd; border: 3px solid #0d1117; border-radius: 50%; box-shadow: 0 0 8px rgba(56,139,253,0.8);"></div>`,
+        html: `<div style="width: 18px; height: 18px; background-color: #00e5ff; border: 3px solid #ffffff; border-radius: 50%; box-shadow: 0 0 16px #00e5ff, inset 0 0 4px rgba(0,0,0,0.5);"></div>`,
         className: 'user-location-icon',
-        iconSize: [22, 22],
-        iconAnchor: [11, 11]
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
       });
-      userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 1000 }).addTo(map);
+      userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 99999 }).addTo(map);
     } else {
       userMarkerRef.current.setLatLng([userLocation.lat, userLocation.lng]);
     }
@@ -250,11 +250,28 @@ export default function MapView({ center, zoom, zones, afterMode, onZoneClick, s
     }
 
     if (routeGeoJSON) {
-      routeLayerRef.current = L.geoJSON(routeGeoJSON, {
+      const routeGroup = L.layerGroup();
+
+      const line = L.geoJSON(routeGeoJSON, {
         pane: 'routePane',
         style: { color: '#3fb950', weight: 6, opacity: 1 }
-      }).addTo(map);
-      map.fitBounds(routeLayerRef.current.getBounds(), { padding: [50, 50], maxZoom: 15, animate: true, duration: 1.5 });
+      });
+      routeGroup.addLayer(line);
+
+      const coords = routeGeoJSON.coordinates;
+      if (coords && coords.length > 1) {
+        const startPoint = coords[0];
+        const endPoint = coords[coords.length - 1];
+
+        const startIcon = L.divIcon({ html: '<div style="font-size: 24px; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5));">🏁</div>', className: 'route-marker', iconSize: [24, 24], iconAnchor: [12, 12] });
+        const endIcon = L.divIcon({ html: '<div style="font-size: 24px; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5));">📍</div>', className: 'route-marker', iconSize: [24, 24], iconAnchor: [12, 24] });
+
+        routeGroup.addLayer(L.marker([startPoint[1], startPoint[0]], { icon: startIcon }).bindTooltip('Start', { permanent: true, direction: 'top', offset: [0, -12] }));
+        routeGroup.addLayer(L.marker([endPoint[1], endPoint[0]], { icon: endIcon }).bindTooltip('End', { permanent: true, direction: 'top', offset: [0, -24] }));
+      }
+
+      routeLayerRef.current = routeGroup.addTo(map);
+      map.fitBounds(line.getBounds(), { padding: [50, 50], maxZoom: 15, animate: true, duration: 1.5 });
     }
   }, [routeGeoJSON]);
 
