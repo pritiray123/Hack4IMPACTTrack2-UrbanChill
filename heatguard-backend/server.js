@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const fetch = global.fetch || ((...args) => import('node-fetch').then(({default: fetch}) => fetch(...args)));
 const { initDB, getDB } = require('./db');
@@ -894,3 +894,5 @@ initDB().catch(err => {
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   });
 });
+
+module.exports = app;

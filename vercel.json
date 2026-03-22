@@ -18,7 +18,7 @@
     },
     {
       "source": "/(.*)",
-      "destination": "heatguard/$1"
+      "destination": "/heatguard/dist/$1"
     }
   ]
 }
